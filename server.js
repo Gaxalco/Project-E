@@ -60,7 +60,6 @@ function serveImagesPage(res) {
     <body>
         <nav>
             <a href="/index">Index</a>
-            <a href="/public/image-description.html">Image description</a>
         </nav>
         <h1>Mur de toutes les zimages</h1>
         <div id="mur">
