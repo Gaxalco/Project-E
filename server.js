@@ -3,66 +3,21 @@ const fs = require('fs');
 const port = 8085;
 
 const server = http.createServer();
+let comments = [];
 
 server.on('request', (req, res) => {
     if (req.method === "GET" && req.url.startsWith('/public/')) {
-
-        try {
-            const file = fs.readFileSync(`.${req.url}`);
-            res.end(file);
-        } catch (err) {
-            console.log(err);
-            res.statusCode = 404;
-            res.end('Page not found');
-        }
-    
+        handlePublicRequest(req, res);
     } else if (req.method === "GET" && req.url === '/') {
-
-        res.writeHead(302, { Location: '/index' });
-        res.end();
-
+        redirectToIndex(res);
     } else if (req.method === "GET" && req.url === '/index') {
-
-        const file = fs.readFileSync('./public/index.html');
-        res.end(file);
-
+        serveIndexPage(res);
     } else if (req.method === "GET" && req.url === '/images') {
-
-        let html = '<!DOCTYPE html><html><head><title>Mur</title><link rel="stylesheet" type="text/css" href="/public/style-mur.css"></head><body>';
-        html += '<a href="/index">Index</a>';
-        html += '<a href="/public/image-description.html">Image description</a>';
-        html += '<h1>Mur de toutes les zimages</h1>';
-        const files = fs.readdirSync('./public/images');
-        html += '<div id="mur">';
-        files.forEach(file => {
-            if (file.endsWith('small.jpg')) {
-                const imageNumber = file.match(/\d+/)[0];
-                html += '<a href="/page-image/' + imageNumber + '"><img src="/public/images/' + file + '" /></a>';
-            }
-        });
-        html += '</div>';
-        html += '</body></html>';
-        res.end(html);
-
+        serveImagesPage(res);
     } else if (req.method === "GET" && req.url.startsWith('/page-image/')) {
-
-        let imageNumber = req.url.split('/')[2];
-
-        let html = '<!DOCTYPE html><html><head><title>Image' + imageNumber + '</title><link rel="stylesheet" type="text/css" href="/public/style-page-image.css"></head><body>';
-        html += '<a href="/images">Mur</a>';
-        html += '<br>';
-        html += '<img id="main_image" src="/public/images/image' + imageNumber + '.jpg" width=500/>';
-        html += '<br>';
-        html += '<p id="comment">Une image... c\'est tout</p>';
-        if (imageNumber > 1) {
-            html += '<a href="/page-image/' + (+imageNumber - 1) + '"><img id="small_image_left" src="/public/images/image' + (+imageNumber - 1) + '_small.jpg" width=auto/>';
-        }
-        if (imageNumber < fs.readdirSync('./public/images').filter(file => file.endsWith('_small.jpg')).length) {
-            html += '<a href="/page-image/' + (+imageNumber + 1) + '"><img id="small_image_right" src="/public/images/image' + (+imageNumber + 1) + '_small.jpg" width=auto/>';
-        }
-        html += '</body></html>';
-        res.end(html);
-
+        serveImagePage(req, res);
+    } else if (req.method === "POST" && req.url.startsWith('/image-description/')) {
+        handleImageDescription(req, res);
     } else {
         res.statusCode = 404;
         res.end('Page not found');
@@ -72,3 +27,119 @@ server.on('request', (req, res) => {
 server.listen(port, () => {
     console.log(`Server running at http://localhost:${port}/`);
 });
+
+function handlePublicRequest(req, res) {
+    try {
+        const file = fs.readFileSync(`.${req.url}`);
+        res.end(file);
+    } catch (err) {
+        console.log(err);
+        res.statusCode = 404;
+        res.end('Page not found');
+    }
+}
+
+function redirectToIndex(res) {
+    res.writeHead(302, { Location: '/index' });
+    res.end();
+}
+
+function serveIndexPage(res) {
+    const file = fs.readFileSync('./public/index.html');
+    res.end(file);
+}
+
+function serveImagesPage(res) {
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Mur</title>
+        <link rel="stylesheet" type="text/css" href="/public/style-mur.css">
+    </head>
+    <body>
+        <nav>
+            <a href="/index">Index</a>
+            <a href="/public/image-description.html">Image description</a>
+        </nav>
+        <h1>Mur de toutes les zimages</h1>
+        <div id="mur">
+    `;
+    const files = fs.readdirSync('./public/images');
+    files.forEach(file => {
+        if (file.endsWith('small.jpg')) {
+            const imageNumber = file.match(/\d+/)[0];
+            html += `<a href="/page-image/${imageNumber}"><img src="/public/images/${file}" /></a>`;
+        }
+    });
+    html += `
+        </div>
+    </body>
+    </html>
+    `;
+    res.end(html);
+}
+
+function serveImagePage(req, res) {
+    let imageNumber = req.url.split('/')[2];
+
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Image ${imageNumber}</title>
+        <link rel="stylesheet" type="text/css" href="/public/style-page-image.css">
+    </head>
+    <body>
+        <a href="/images">Mur</a>
+        <br>
+        <img id="main_image" src="/public/images/image${imageNumber}.jpg" width=500/>
+        <br>
+        <p id="comment">Une image... c'est tout</p>
+    `;
+    if (imageNumber > 1) {
+        html += `<a href="/page-image/${+imageNumber - 1}"><img id="small_image_left" src="/public/images/image${+imageNumber - 1}_small.jpg" width=auto/></a>`;
+    }
+    html += `
+        <div id="comments-section">
+            <h2>Commentaires</h2>
+            <div id="comments">
+    `;
+    comments.forEach(comment => {
+        if (comment.imageNumber == imageNumber) {
+            html += `<p class="comment">${comment.description}</p>`;
+        }
+    });
+    html += `
+            </div>
+            <h3>Ajouter un commentaire</h3>
+            <form action="/image-description/${imageNumber}" method="POST">
+                <input type="hidden" name="imageNumber" value="${imageNumber}">
+                <textarea id="textComment" name="description" rows="4" cols="50" placeholder="Votre commentaire..."></textarea>
+                <br>
+                <input id="sendComment" type="submit" value="Envoyer">
+            </form>
+        </div>
+    `;
+    if (imageNumber < fs.readdirSync('./public/images').filter(file => file.endsWith('_small.jpg')).length) {
+        html += `<a href="/page-image/${+imageNumber + 1}"><img id="small_image_right" src="/public/images/image${+imageNumber + 1}_small.jpg" width="auto"/></a>`;
+    }
+    html += `
+        </body>
+    </html>
+    `;
+    res.end(html);
+}
+
+function handleImageDescription(req, res) {
+    req.on("data", (data) => {
+        let imageNumber = data.toString().split('&')[0].split('=')[1];
+        let description = data.toString().split('&')[1].split('=')[1].replace(/\+/g, ' ').replace(/%0D%0A/g, '<br>');
+        comments.push({ imageNumber, description });
+        console.log(comments);
+    });
+    res.statusCode = 302;
+    let imageNumber = req.url.split('/')[2];
+    res.setHeader('Location', `/page-image/${imageNumber}`);
+    res.end();
+}
