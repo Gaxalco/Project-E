@@ -1,0 +1,19 @@
+#mur {
+    display: block;
+}
+
+@media screen and (min-width: 600px) {
+    #mur {
+        column-count: 5;
+    }
+}
+
+@media screen and (min-width: 300px) {
+    #mur {
+        column-count: 3;
+    }
+}
+
+#mur {
+    column-count: 1;
+}
