@@ -91,7 +91,7 @@ function serveImagePage(req, res) {
         <link rel="stylesheet" type="text/css" href="/public/style-page-image.css">
     </head>
     <body>
-        <a href="/images">Mur</a>
+        <a id="index" href="/images">Mur</a>
         <br>
         <img id="main_image" src="/public/images/image${imageNumber}.jpg" width=500/>
         <br>
