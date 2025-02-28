@@ -4,6 +4,7 @@ const port = 8085;
 
 const server = http.createServer();
 let comments = [];
+let likes = [];
 
 server.on('request', (req, res) => {
     if (req.method === "GET" && req.url.startsWith('/public/')) {
@@ -18,6 +19,8 @@ server.on('request', (req, res) => {
         serveImagePage(req, res);
     } else if (req.method === "POST" && req.url.startsWith('/image-description/')) {
         handleImageDescription(req, res);
+    } else if (req.method === "POST" && req.url.startsWith('/image-like/')) {
+        handleImageLike(req, res);
     } else {
         res.statusCode = 404;
         res.end('Page not found');
@@ -68,7 +71,9 @@ function serveImagesPage(res) {
     files.forEach(file => {
         if (file.endsWith('small.jpg')) {
             const imageNumber = file.match(/\d+/)[0];
-            html += `<a href="/page-image/${imageNumber}"><img src="/public/images/${file}" /></a>`;
+            html += `
+            <a href="/page-image/${imageNumber}"><img src="/public/images/${file}" /></a>
+            `;
         }
     });
     html += `
@@ -81,6 +86,7 @@ function serveImagesPage(res) {
 
 function serveImagePage(req, res) {
     let imageNumber = req.url.split('/')[2];
+    let isLiked = likes.some(like => like.imageNumber == imageNumber);
 
     let html = `
     <!DOCTYPE html>
@@ -92,7 +98,10 @@ function serveImagePage(req, res) {
     <body>
         <a id="index" href="/images">Mur</a>
         <br>
-        <img id="main_image" src="/public/images/image${imageNumber}.jpg" width=500/>
+        <div class="image-container">
+            <img id="main_image" src="/public/images/image${imageNumber}.jpg" width=500/>
+            <span id="heart-icon" class="heart-icon" style="color: ${isLiked ? 'red' : 'black'};">&#9829;</span>
+        </div>
         <br>
         <p id="comment">Une image... c'est tout</p>
     `;
@@ -124,6 +133,26 @@ function serveImagePage(req, res) {
         html += `<a href="/page-image/${+imageNumber + 1}"><img id="small_image_right" src="/public/images/image${+imageNumber + 1}_small.jpg" width="auto"/></a>`;
     }
     html += `
+        <script>
+            document.getElementById('heart-icon').addEventListener('click', function() {
+                fetch('/image-like/${imageNumber}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'imageNumber=' + ${imageNumber}
+                }).then(response => {
+                    if (response.ok) {
+                        if (this.style.color === 'red') {
+                            this.style.color = 'black';
+                        }
+                        else {
+                            this.style.color = 'red';
+                        }
+                    }
+                });
+            });
+        </script>
         </body>
     </html>
     `;
@@ -136,6 +165,22 @@ function handleImageDescription(req, res) {
         let description = data.toString().split('&')[1].split('=')[1].replace(/\+/g, ' ').replace(/%0D%0A/g, '<br>');
         comments.push({ imageNumber, description });
         console.log(comments);
+    });
+    res.statusCode = 302;
+    let imageNumber = req.url.split('/')[2];
+    res.setHeader('Location', `/page-image/${imageNumber}`);
+    res.end();
+}
+
+function handleImageLike(req, res) {
+    req.on("data", (data) => {
+        let imageNumber = data.toString().split('&')[0].split('=')[1];
+        if (!likes.some(like => like.imageNumber == imageNumber)) {
+            likes.push({ imageNumber });
+        } else {
+            likes = likes.filter(like => like.imageNumber != imageNumber);
+        }
+        console.log(likes);
     });
     res.statusCode = 302;
     let imageNumber = req.url.split('/')[2];
